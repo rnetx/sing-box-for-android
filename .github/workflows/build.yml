@@ -74,7 +74,6 @@ jobs:
 
       - name: Release
         uses: svenstaro/upload-release-action@v2
-        if: steps.build_libbox.outputs.status == 'success' && steps.build_apk.outputs.status == 'success'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           release_name: ${{ env.RELEASE_NAME }}
