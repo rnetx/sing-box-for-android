@@ -45,4 +45,10 @@ ALIAS_NAME
 ALIAS_PASS
 ```
 4. 修改 build_libbox.sh，你可以改成自己想要的仓库和分支，这步不懂可以什么都不动
-5. 在 Action 中触发构建
+5. 允许 Action 发布到 Release
+```
+仓库 ==> settings ==> Actions ==> General ==> Workflow permissions ==> 选 Read and write permissions ==> Save
+
+不设置会报错： Resource not accessible by integration
+```
+6. 在 Action 中触发构建
