@@ -33,6 +33,8 @@ under the original name.
 
 ## 用法
 
+你可以使用 Release 中构建好的 APK，也可以按照以下方法构建你的 APK
+
 1. Fork 本项目
 2. 本地生成 Android JKS 签名文件，并上传替换 app/android.jks (具体看下面)
 3. 添加 Secrets
