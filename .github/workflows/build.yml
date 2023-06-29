@@ -1,0 +1,84 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: '版本号'
+        required: false
+        default: '1.0'
+
+      version_code:
+        description: '小版本号，保持默认'
+        required: false
+        default: '1'
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Prepare
+        run: |
+          sudo apt-get update
+          sudo apt-get install dos2unix
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20.5'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'oracle'
+          java-version: '20'
+
+      - name: Setup Gradles
+        uses: gradle/gradle-build-action@v2
+
+      - name: Build Libbox
+        id: build_libbox
+        run: |
+          chmod 0755 build_libbox.sh
+          dos2unix ./build_libbox.sh
+          ./build_libbox.sh
+          cd $GITHUB_WORKSPACE
+          mkdir -p app/libs
+          cp sing-box/libbox.aar app/libs/ || exit 1
+
+      - name: Execute Gradle build
+        id: build_apk
+        run: |
+          dos2unix ./gradlew
+          chmod 0755 ./gradlew
+          ./gradlew assembleRelease
+        env:
+          VERSION_CODE: ${{ github.event.inputs.version_code }}
+          VERSION_NAME: ${{ github.event.inputs.version_name }}
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          ALIAS_NAME: ${{ secrets.ALIAS_NAME }}
+          ALIAS_PASS: ${{ secrets.ALIAS_PASS }}
+
+      - name: Prepare Release
+        run: |
+          tag="${{ github.event.inputs.version_name }}-${{ github.event.inputs.version_code }}-$(date +%Y%m%d%H%M)"
+          echo "RELEASE_NAME=Released on ${tag}" >> $GITHUB_ENV
+          echo "TAG_NAME=${tag}" >> $GITHUB_ENV
+          mkdir release
+          cp ./app/build/outputs/apk/release/*.apk release/
+          cp ./app/libs/libbox.aar release/
+
+      - name: Release
+        uses: svenstaro/upload-release-action@v2
+        if: steps.build_libbox.outputs.status == 'success' && steps.build_apk.outputs.status == 'success'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          release_name: ${{ env.RELEASE_NAME }}
+          tag: ${{ env.TAG_NAME }}
+          file_glob: true
+          file: |
+           ./release/*

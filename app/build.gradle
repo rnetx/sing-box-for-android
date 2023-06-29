@@ -20,16 +20,16 @@ android {
         applicationId "io.nekohasekai.sfa"
         minSdk 21
         targetSdk 33
-        versionCode getProps("VERSION_CODE").toInteger()
-        versionName getProps("VERSION_NAME")
+        versionCode System.getenv("VERSION_CODE").toInteger()
+        versionName System.getenv("VERSION_NAME")
     }
 
     signingConfigs {
         release {
-            storeFile file("release.keystore")
-            storePassword getProps("KEYSTORE_PASS")
-            keyAlias getProps("ALIAS_NAME")
-            keyPassword getProps("ALIAS_PASS")
+            storeFile file("android.jks")
+            storePassword System.getenv("KEYSTORE_PASS")
+            keyAlias System.getenv("ALIAS_NAME")
+            keyPassword System.getenv("ALIAS_PASS")
         }
     }
 
