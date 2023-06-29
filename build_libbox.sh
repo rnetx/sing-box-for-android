@@ -17,6 +17,8 @@ tags="with_dhcp,with_lwip,with_acme,with_gvisor,with_v2ray_api,with_quic,with_wi
 ####################
 ###### !! 不要动 !! ######
 make lib_install
-version=$(git rev-parse --short HEAD)
+commit=$(git rev-parse --short HEAD)
+version=$(CGO_ENABLED=0 go run ./cmd/internal/read_tag)
+version="${version}-${commit}"
 CGO_ENABLED=1 gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box -tags ${tags} -ldflags "-X github.com/sagernet/sing-box/constant.Version=${version} -buildid=" ./experimental/libbox
 ##########################
