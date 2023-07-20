@@ -13,7 +13,7 @@ git submodule init
 git submodule update
 ####################
 # 这里可以修改 tags
-tags="with_dhcp,with_lwip,with_acme,with_gvisor,with_v2ray_api,with_quic,with_wireguard,with_utls,with_reality_server,with_clash_api,with_shadowsocksr,with_grpc,with_ech,with_proxyprovider,with_clash_ui,with_multiaddr"
+tags="with_dhcp,with_lwip,with_gvisor,with_v2ray_api,with_quic,with_wireguard,with_utls,with_reality_server,with_clash_api,with_shadowsocksr,with_grpc,with_ech,with_proxyprovider,with_clash_ui,with_multiaddr"
 ####################
 ###### !! 不要动 !! ######
 make lib_install
