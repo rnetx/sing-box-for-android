@@ -122,6 +122,7 @@ class BoxService(
 
             DefaultNetworkMonitor.start()
             Libbox.registerLocalDNSTransport(LocalResolver)
+            Libbox.setMemoryLimit(!Settings.disableMemoryLimit)
 
             val newService = try {
                 Libbox.newService(content, platformInterface)
@@ -132,7 +133,7 @@ class BoxService(
 
             newService.start()
             boxService = newService
-
+            commandServer?.setService(boxService)
             status.postValue(Status.Started)
         } catch (e: Exception) {
             stopAndAlert(Alert.StartService, e.message)
@@ -147,6 +148,7 @@ class BoxService(
                 pfd.close()
                 fileDescriptor = null
             }
+            commandServer?.setService(null)
             boxService?.apply {
                 runCatching {
                     close()
@@ -174,6 +176,7 @@ class BoxService(
                 pfd.close()
                 fileDescriptor = null
             }
+            commandServer?.setService(null)
             boxService?.apply {
                 runCatching {
                     close()

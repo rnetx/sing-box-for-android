@@ -58,9 +58,16 @@
     <string name="service_error_title_start_command_server">Start command server</string>
     <string name="service_error_title_create_service">Create service</string>
     <string name="service_error_title_start_service">Start service</string>
-    <string name="profile_status">Status</string>
+
     <string name="status_memory">Memory</string>
     <string name="status_goroutines">Goroutines</string>
+    <string name="status_inbound_connections">Inbound Connections</string>
+    <string name="status_outbound_connections">Outbound Connections</string>
+    <string name="status_uplink">Uplink</string>
+    <string name="status_downlink">Downlink</string>
+    <string name="status_uplink_total">Uplink Total</string>
+    <string name="status_downlink_total">Downlink Total</string>
+
     <string name="profile">Profile</string>
     <string name="core_version">Version</string>
     <string name="core">Core</string>
@@ -79,5 +86,10 @@
     <string name="app_description">Android client for sing-box, the universal proxy platform.</string>
     <string name="documentation_button">Documentation</string>
     <string name="community_button">Community</string>
+    <string name="memory_limit">Memory Limit</string>
+    <string name="background_permission">Background permission</string>
+    <string name="background_permission_description">Apply for the necessary permissions in order for the VPN to function properly.\n\nIf you are using a device made by a Chinese company, the card may not disappear after the permission is granted.</string>
+    <string name="read_more">Read More</string>
+    <string name="request_background_permission">Ignore battery optimizations</string>
 
 </resources>
