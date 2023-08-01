@@ -26,6 +26,8 @@ import com.microsoft.appcenter.distribute.DistributeListener
 import com.microsoft.appcenter.distribute.ReleaseDetails
 import com.microsoft.appcenter.distribute.UpdateAction
 import com.microsoft.appcenter.utils.AppNameHelper
+import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.ProfileContent
 import io.nekohasekai.sfa.Application
 import io.nekohasekai.sfa.BuildConfig
 import io.nekohasekai.sfa.R
@@ -34,14 +36,20 @@ import io.nekohasekai.sfa.bg.ServiceNotification
 import io.nekohasekai.sfa.constant.Alert
 import io.nekohasekai.sfa.constant.ServiceMode
 import io.nekohasekai.sfa.constant.Status
+import io.nekohasekai.sfa.database.Profile
+import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.databinding.ActivityMainBinding
 import io.nekohasekai.sfa.ktx.errorDialogBuilder
+import io.nekohasekai.sfa.ui.profile.NewProfileActivity
 import io.nekohasekai.sfa.ui.shared.AbstractActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.Date
 import java.util.LinkedList
 
 class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeListener {
@@ -64,6 +72,7 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
         setContentView(binding.root)
 
         val navController = findNavController(R.id.nav_host_fragment_activity_my)
+        navController.navigate(R.id.navigation_dashboard)
         val appBarConfiguration =
             AppBarConfiguration(
                 setOf(
@@ -78,6 +87,93 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
 
         reconnect()
         startAnalysis()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val uri = intent.data ?: return
+        if (uri.scheme == "sing-box" && uri.host != "import-remote-profile") {
+            val profile = try {
+                Libbox.parseRemoteProfileImportLink(uri.toString())
+            } catch (e: Exception) {
+                errorDialogBuilder(e).show()
+                return
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.import_remote_profile)
+                .setMessage(
+                    getString(
+                        R.string.import_remote_profile_message,
+                        profile.name,
+                        profile.host
+                    )
+                )
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    startActivity(Intent(this, NewProfileActivity::class.java).apply {
+                        putExtra("importName", profile.name)
+                        putExtra("importURL", profile.url)
+                    })
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } else if (intent.action == Intent.ACTION_VIEW) {
+            try {
+                val data = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+                val content = Libbox.decodeProfileContent(data)
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.import_profile)
+                    .setMessage(
+                        getString(
+                            R.string.import_profile_message,
+                            content.name
+                        )
+                    )
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        lifecycleScope.launch {
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    importProfile(content)
+                                }.onFailure {
+                                    withContext(Dispatchers.Main) {
+                                        errorDialogBuilder(it).show()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } catch (e: Exception) {
+                errorDialogBuilder(e).show()
+            }
+        }
+    }
+
+    private suspend fun importProfile(content: ProfileContent) {
+        val typedProfile = TypedProfile()
+        val profile = Profile(name = content.name, typed = typedProfile)
+        profile.userOrder = ProfileManager.nextOrder()
+        when (content.type) {
+            Libbox.ProfileTypeLocal -> {
+                typedProfile.type = TypedProfile.Type.Local
+            }
+
+            Libbox.ProfileTypeiCloud -> {
+                errorDialogBuilder(R.string.icloud_profile_unsupported).show()
+                return
+            }
+
+            Libbox.ProfileTypeRemote -> {
+                typedProfile.type = TypedProfile.Type.Remote
+                typedProfile.remoteURL = content.remotePath
+                typedProfile.lastUpdated = Date(content.lastUpdated)
+            }
+        }
+        val configDirectory = File(filesDir, "configs").also { it.mkdirs() }
+        val configFile = File(configDirectory, "${profile.userOrder}.json")
+        configFile.writeText(content.config)
+        typedProfile.path = configFile.path
+        ProfileManager.create(profile)
     }
 
     fun reconnect() {
@@ -104,7 +200,7 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
         val builder = MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.analytics_title))
             .setMessage(getString(R.string.analytics_message))
-            .setPositiveButton(getString(R.string.ok)) { _, _ ->
+            .setPositiveButton(android.R.string.ok) { _, _ ->
                 lifecycleScope.launch(Dispatchers.IO) {
                     Settings.analyticsAllowed = Settings.ANALYSIS_ALLOWED
                     startAnalysisInternal()
@@ -258,7 +354,7 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
 
     override fun onServiceAlert(type: Alert, message: String?) {
         val builder = MaterialAlertDialogBuilder(this)
-        builder.setPositiveButton(resources.getString(android.R.string.ok), null)
+        builder.setPositiveButton(android.R.string.ok, null)
         when (type) {
             Alert.RequestVPNPermission -> {
                 builder.setMessage(getString(R.string.service_error_missing_permission))

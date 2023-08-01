@@ -2,6 +2,7 @@ package io.nekohasekai.sfa.ui.main
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -23,6 +24,7 @@ import io.nekohasekai.sfa.ktx.launchCustomTab
 import io.nekohasekai.sfa.ktx.setSimpleItems
 import io.nekohasekai.sfa.ktx.text
 import io.nekohasekai.sfa.ui.MainActivity
+import io.nekohasekai.sfa.ui.profileoverride.ProfileOverrideActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,9 +58,6 @@ class SettingsFragment : Fragment() {
                 activity.getExternalFilesDir(null)?.deleteRecursively()
                 reloadSettings()
             }
-        }
-        lifecycleScope.launch(Dispatchers.IO) {
-            reloadSettings()
         }
         binding.appCenterEnabled.addTextChangedListener {
             lifecycleScope.launch(Dispatchers.IO) {
@@ -104,11 +103,17 @@ class SettingsFragment : Fragment() {
                 )
             )
         }
+        binding.configureOverridesButton.setOnClickListener {
+            startActivity(Intent(requireContext(), ProfileOverrideActivity::class.java))
+        }
         binding.communityButton.setOnClickListener {
             it.context.launchCustomTab("https://community.sagernet.org/")
         }
         binding.documentationButton.setOnClickListener {
             it.context.launchCustomTab("http://sing-box.sagernet.org/installation/clients/sfa/")
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            reloadSettings()
         }
     }
 
@@ -120,8 +125,11 @@ class SettingsFragment : Fragment() {
         )
         val appCenterEnabled = Settings.analyticsAllowed == Settings.ANALYSIS_ALLOWED
         val checkUpdateEnabled = Settings.checkUpdateEnabled
-        val removeBackgroudPermissionPage =
+        val removeBackgroudPermissionPage = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Application.powerManager.isIgnoringBatteryOptimizations(Application.application.packageName)
+        } else {
+            true
+        }
         withContext(Dispatchers.Main) {
             binding.dataSizeText.text = dataSize
             binding.appCenterEnabled.text = EnabledType.from(appCenterEnabled).name

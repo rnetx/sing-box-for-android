@@ -13,6 +13,7 @@ import io.nekohasekai.sfa.ktx.boolean
 import io.nekohasekai.sfa.ktx.int
 import io.nekohasekai.sfa.ktx.long
 import io.nekohasekai.sfa.ktx.string
+import io.nekohasekai.sfa.ktx.stringSet
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -44,6 +45,16 @@ object Settings {
     var checkUpdateEnabled by dataStore.boolean(SettingsKey.CHECK_UPDATE_ENABLED) { true }
     var disableMemoryLimit by dataStore.boolean(SettingsKey.DISABLE_MEMORY_LIMIT)
 
+
+    const val PER_APP_PROXY_DISABLED = 0
+    const val PER_APP_PROXY_EXCLUDE = 1
+    const val PER_APP_PROXY_INCLUDE = 2
+
+    var perAppProxyEnabled by dataStore.boolean(SettingsKey.PER_APP_PROXY_ENABLED) { false }
+    var perAppProxyMode by dataStore.int(SettingsKey.PER_APP_PROXY_MODE) { PER_APP_PROXY_EXCLUDE }
+    var perAppProxyList by dataStore.stringSet(SettingsKey.PER_APP_PROXY_LIST) { emptySet() }
+    var perAppProxyUpdateOnChange by dataStore.int(SettingsKey.PER_APP_PROXY_UPDATE_ON_CHANGE) { PER_APP_PROXY_DISABLED }
+
     fun serviceClass(): Class<*> {
         return when (serviceMode) {
             ServiceMode.VPN -> VPNService::class.java
@@ -69,7 +80,7 @@ object Settings {
     private suspend fun needVPNService(): Boolean {
         val selectedProfileId = selectedProfile
         if (selectedProfileId == -1L) return false
-        val profile = Profiles.get(selectedProfile) ?: return false
+        val profile = ProfileManager.get(selectedProfile) ?: return false
         val content = JSONObject(File(profile.typed.path).readText())
         val inbounds = content.getJSONArray("inbounds")
         for (index in 0 until inbounds.length()) {

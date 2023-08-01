@@ -14,9 +14,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.database.Profile
-import io.nekohasekai.sfa.database.Profiles
+import io.nekohasekai.sfa.database.ProfileManager
+import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.databinding.FragmentConfigurationBinding
 import io.nekohasekai.sfa.databinding.ViewConfigutationItemBinding
+import io.nekohasekai.sfa.ktx.errorDialogBuilder
+import io.nekohasekai.sfa.ktx.shareProfile
 import io.nekohasekai.sfa.ui.profile.EditProfileActivity
 import io.nekohasekai.sfa.ui.profile.NewProfileActivity
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +64,7 @@ class ConfigurationFragment : Fragment() {
         binding.fab.setOnClickListener {
             startActivity(Intent(requireContext(), NewProfileActivity::class.java))
         }
+        ProfileManager.registerCallback(this::updateProfiles)
         return binding.root
     }
 
@@ -71,20 +75,27 @@ class ConfigurationFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        ProfileManager.unregisterCallback(this::updateProfiles)
         _adapter = null
+    }
+
+    private fun updateProfiles() {
+        _adapter?.reload()
     }
 
     class Adapter(
         internal val scope: CoroutineScope,
-        private val parent: FragmentConfigurationBinding
+        internal val parent: FragmentConfigurationBinding
     ) :
         RecyclerView.Adapter<Holder>() {
 
         internal var items: MutableList<Profile> = mutableListOf()
+        private var isMoving = false
 
         internal fun reload() {
+            if (isMoving) return
             scope.launch(Dispatchers.IO) {
-                items = Profiles.list().toMutableList()
+                items = ProfileManager.list().toMutableList()
                 withContext(Dispatchers.Main) {
                     if (items.isEmpty()) {
                         parent.statusText.isVisible = true
@@ -115,8 +126,10 @@ class ConfigurationFragment : Fragment() {
             first.userOrder = previousOrder
             updated.add(first)
             notifyItemMoved(from, to)
+            isMoving = true
             GlobalScope.launch(Dispatchers.IO) {
-                Profiles.update(updated)
+                ProfileManager.update(updated)
+                isMoving = false
             }
             return true
         }
@@ -152,18 +165,34 @@ class ConfigurationFragment : Fragment() {
                 intent.putExtra("profile_id", profile.id)
                 it.context.startActivity(intent)
             }
-            binding.moreButton.setOnClickListener { it ->
-                val popup = PopupMenu(it.context, it)
+            binding.moreButton.setOnClickListener { button ->
+                val popup = PopupMenu(button.context, button)
                 popup.setForceShowIcon(true)
                 popup.menuInflater.inflate(R.menu.profile_menu, popup.menu)
+                if (profile.typed.type != TypedProfile.Type.Remote) {
+                    popup.menu.removeItem(R.id.action_share)
+                }
                 popup.setOnMenuItemClickListener {
                     when (it.itemId) {
+                        R.id.action_share -> {
+                            adapter.scope.launch(Dispatchers.IO) {
+                                try {
+                                    button.context.shareProfile(profile)
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        button.context.errorDialogBuilder(e).show()
+                                    }
+                                }
+                            }
+                            true
+                        }
+
                         R.id.action_delete -> {
                             adapter.items.remove(profile)
                             adapter.notifyItemRemoved(adapterPosition)
                             adapter.scope.launch(Dispatchers.IO) {
                                 runCatching {
-                                    Profiles.delete(profile)
+                                    ProfileManager.delete(profile)
                                 }
                             }
                             true

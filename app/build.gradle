@@ -19,9 +19,10 @@ android {
     defaultConfig {
         applicationId "io.nekohasekai.sfa"
         minSdk 21
-        targetSdk 33
+        targetSdk 34
         versionCode System.getenv("VERSION_CODE").toInteger()
         versionName System.getenv("VERSION_NAME")
+        setProperty("archivesBaseName", "SFA-" + versionName)
     }
 
     signingConfigs {
@@ -63,6 +64,12 @@ android {
         viewBinding true
         aidl true
     }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = (outputFileName as String).replace("-release", "")
+        }
+    }
 }
 
 dependencies {
@@ -82,15 +89,26 @@ dependencies {
     ksp 'androidx.room:room-compiler:2.5.2'
     implementation 'androidx.work:work-runtime-ktx:2.8.1'
     implementation 'androidx.browser:browser:1.5.0'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
     // DO NOT UPDATE (minSdkVersion updated)
     implementation 'com.blacksquircle.ui:editorkit:2.2.0'
     implementation 'com.blacksquircle.ui:language-json:2.2.0'
 
-    implementation 'com.microsoft.appcenter:appcenter-analytics:5.0.1'
-    implementation 'com.microsoft.appcenter:appcenter-crashes:5.0.1'
-    implementation 'com.microsoft.appcenter:appcenter-distribute:5.0.1'
+    implementation 'com.microsoft.appcenter:appcenter-analytics:5.0.2'
+    implementation 'com.microsoft.appcenter:appcenter-crashes:5.0.2'
+    implementation 'com.microsoft.appcenter:appcenter-distribute:5.0.2'
+
+    implementation('org.smali:dexlib2:2.5.2') {
+        exclude group: 'com.google.guava', module: 'guava'
+    }
+    implementation('com.google.guava:guava:32.1.1-android')
+    // ref: https://github.com/google/guava/releases/tag/v32.1.0#user-content-duplicate-ListenableFuture
+    modules {
+        module("com.google.guava:listenablefuture") {
+            replacedBy("com.google.guava:guava", "listenablefuture is part of guava")
+        }
+    }
 }
 
 if (getProps("APPCENTER_TOKEN") != "") {

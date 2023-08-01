@@ -39,6 +39,36 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="import-remote-profile"
+                    android:scheme="sing-box" />
+
+            </intent-filter>
+
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.OPENABLE" />
+
+                <data android:host="*" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.bpf" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.bpf" />
+                <data android:pathPattern=".*\\..*\\..*\\.bpf" />
+                <data android:pathPattern=".*\\..*\\.bpf" />
+                <data android:pathPattern=".*\\.bpf" />
+                <data android:scheme="content" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -64,6 +94,12 @@
             android:exported="false" />
         <activity
             android:name="io.nekohasekai.sfa.ui.profile.EditProfileContentActivity"
+            android:exported="false" />
+        <activity
+            android:name="io.nekohasekai.sfa.ui.profileoverride.ProfileOverrideActivity"
+            android:exported="false" />
+        <activity
+            android:name="io.nekohasekai.sfa.ui.profileoverride.PerAppProxyActivity"
             android:exported="false" />
 
         <service
@@ -101,6 +137,16 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.cache"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/cache_paths" />
+        </provider>
 
     </application>
 

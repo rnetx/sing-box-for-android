@@ -20,7 +20,7 @@ import io.nekohasekai.sfa.Application
 import io.nekohasekai.sfa.constant.Action
 import io.nekohasekai.sfa.constant.Alert
 import io.nekohasekai.sfa.constant.Status
-import io.nekohasekai.sfa.database.Profiles
+import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -39,12 +39,14 @@ class BoxService(
         private var initializeOnce = false
         private fun initialize() {
             if (initializeOnce) return
-            val baseDir = Application.application.getExternalFilesDir(null) ?: return
+            val baseDir = Application.application.filesDir
             baseDir.mkdirs()
+            val workingDir = Application.application.getExternalFilesDir(null) ?: return
+            workingDir.mkdirs()
             val tempDir = Application.application.cacheDir
             tempDir.mkdirs()
-            Libbox.setup(baseDir.path, tempDir.path, -1, -1)
-            Libbox.redirectStderr(File(baseDir, "stderr.log").path)
+            Libbox.setup(baseDir.path, workingDir.path, tempDir.path, false)
+            Libbox.redirectStderr(File(workingDir, "stderr.log").path)
             initializeOnce = true
             return
         }
@@ -61,6 +63,14 @@ class BoxService(
         fun stop() {
             Application.application.sendBroadcast(
                 Intent(Action.SERVICE_CLOSE).setPackage(
+                    Application.application.packageName
+                )
+            )
+        }
+
+        fun reload() {
+            Application.application.sendBroadcast(
+                Intent(Action.SERVICE_RELOAD).setPackage(
                     Application.application.packageName
                 )
             )
@@ -82,19 +92,22 @@ class BoxService(
                 Action.SERVICE_CLOSE -> {
                     stopService()
                 }
+
+                Action.SERVICE_RELOAD -> {
+                    serviceReload()
+                }
             }
         }
     }
 
     private fun startCommandServer() {
         val commandServer =
-            CommandServer(Application.application.filesDir.absolutePath, this, 300)
+            CommandServer(this, 300)
         commandServer.start()
         this.commandServer = commandServer
     }
 
     private suspend fun startService() {
-        initialize()
         try {
             val selectedProfileId = Settings.selectedProfile
             if (selectedProfileId == -1L) {
@@ -102,7 +115,7 @@ class BoxService(
                 return
             }
 
-            val profile = Profiles.get(selectedProfileId)
+            val profile = ProfileManager.get(selectedProfileId)
             if (profile == null) {
                 stopAndAlert(Alert.EmptyConfiguration)
                 return
@@ -224,6 +237,7 @@ class BoxService(
         if (!receiverRegistered) {
             service.registerReceiver(receiver, IntentFilter().apply {
                 addAction(Action.SERVICE_CLOSE)
+                addAction(Action.SERVICE_RELOAD)
             })
             receiverRegistered = true
         }
@@ -231,6 +245,7 @@ class BoxService(
         notification.show()
         GlobalScope.launch(Dispatchers.IO) {
             Settings.startedByUser = true
+            initialize()
             try {
                 startCommandServer()
             } catch (e: Exception) {
