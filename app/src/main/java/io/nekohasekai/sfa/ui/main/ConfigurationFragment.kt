@@ -15,7 +15,6 @@ import androidx.recyclerview.widget.RecyclerView
 import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
-import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.databinding.FragmentConfigurationBinding
 import io.nekohasekai.sfa.databinding.ViewConfigutationItemBinding
 import io.nekohasekai.sfa.ktx.errorDialogBuilder
@@ -169,9 +168,6 @@ class ConfigurationFragment : Fragment() {
                 val popup = PopupMenu(button.context, button)
                 popup.setForceShowIcon(true)
                 popup.menuInflater.inflate(R.menu.profile_menu, popup.menu)
-                if (profile.typed.type != TypedProfile.Type.Remote) {
-                    popup.menu.removeItem(R.id.action_share)
-                }
                 popup.setOnMenuItemClickListener {
                     when (it.itemId) {
                         R.id.action_share -> {
