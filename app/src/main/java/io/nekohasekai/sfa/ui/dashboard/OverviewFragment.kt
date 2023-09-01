@@ -1,5 +1,6 @@
 package io.nekohasekai.sfa.ui.dashboard
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -7,6 +8,7 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.divider.MaterialDividerItemDecoration
@@ -19,27 +21,30 @@ import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.databinding.FragmentDashboardOverviewBinding
+import io.nekohasekai.sfa.databinding.ViewClashModeButtonBinding
 import io.nekohasekai.sfa.databinding.ViewProfileItemBinding
 import io.nekohasekai.sfa.ktx.errorDialogBuilder
+import io.nekohasekai.sfa.ktx.getAttrColor
 import io.nekohasekai.sfa.ui.MainActivity
 import io.nekohasekai.sfa.utils.CommandClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class OverviewFragment : Fragment(), CommandClient.Handler {
+class OverviewFragment : Fragment() {
 
     private val activity: MainActivity? get() = super.getActivity() as MainActivity?
     private var _binding: FragmentDashboardOverviewBinding? = null
     private val binding get() = _binding!!
-    private val commandClient =
-        CommandClient(lifecycleScope, CommandClient.ConnectionType.Status, this)
+    private val statusClient =
+        CommandClient(lifecycleScope, CommandClient.ConnectionType.Status, StatusClient())
+    private val clashModeClient =
+        CommandClient(lifecycleScope, CommandClient.ConnectionType.ClashMode, ClashModeClient())
 
-    private var _adapter: Adapter? = null
-    private val adapter get() = _adapter!!
-
+    private var adapter: Adapter? = null
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -51,7 +56,7 @@ class OverviewFragment : Fragment(), CommandClient.Handler {
     private fun onCreate() {
         val activity = activity ?: return
         binding.profileList.adapter = Adapter(lifecycleScope, binding).apply {
-            _adapter = this
+            adapter = this
             reload()
         }
         binding.profileList.layoutManager = LinearLayoutManager(requireContext())
@@ -60,8 +65,12 @@ class OverviewFragment : Fragment(), CommandClient.Handler {
         binding.profileList.addItemDecoration(divider)
         activity.serviceStatus.observe(viewLifecycleOwner) {
             binding.statusContainer.isVisible = it == Status.Starting || it == Status.Started
+            if (it != Status.Started) {
+                binding.clashModeCard.isVisible = false
+            }
             if (it == Status.Started) {
-                commandClient.connect()
+                statusClient.connect()
+                clashModeClient.connect()
             }
         }
         ProfileManager.registerCallback(this::updateProfiles)
@@ -69,49 +78,143 @@ class OverviewFragment : Fragment(), CommandClient.Handler {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _adapter = null
+        adapter = null
         _binding = null
-        commandClient.disconnect()
+        statusClient.disconnect()
+        clashModeClient.disconnect()
         ProfileManager.unregisterCallback(this::updateProfiles)
     }
 
     private fun updateProfiles() {
-        _adapter?.reload()
+        adapter?.reload()
     }
 
-    override fun onConnected() {
-        val binding = _binding ?: return
-        lifecycleScope.launch(Dispatchers.Main) {
-            binding.memoryText.text = getString(R.string.loading)
-            binding.goroutinesText.text = getString(R.string.loading)
-        }
-    }
+    inner class StatusClient : CommandClient.Handler {
 
-    override fun onDisconnected() {
-        val binding = _binding ?: return
-        lifecycleScope.launch(Dispatchers.Main) {
-            binding.memoryText.text = getString(R.string.loading)
-            binding.goroutinesText.text = getString(R.string.loading)
-        }
-    }
-
-    override fun updateStatus(status: StatusMessage) {
-        val binding = _binding ?: return
-        lifecycleScope.launch(Dispatchers.Main) {
-            binding.memoryText.text = Libbox.formatBytes(status.memory)
-            binding.goroutinesText.text = status.goroutines.toString()
-            val trafficAvailable = status.trafficAvailable
-            binding.trafficContainer.isVisible = trafficAvailable
-            if (trafficAvailable) {
-                binding.inboundConnectionsText.text = status.connectionsIn.toString()
-                binding.outboundConnectionsText.text = status.connectionsOut.toString()
-                binding.uplinkText.text = Libbox.formatBytes(status.uplink) + "/s"
-                binding.downlinkText.text = Libbox.formatBytes(status.downlink) + "/s"
-                binding.uplinkTotalText.text = Libbox.formatBytes(status.uplinkTotal)
-                binding.downlinkTotalText.text = Libbox.formatBytes(status.downlinkTotal)
+        override fun onConnected() {
+            val binding = _binding ?: return
+            lifecycleScope.launch(Dispatchers.Main) {
+                binding.memoryText.text = getString(R.string.loading)
+                binding.goroutinesText.text = getString(R.string.loading)
             }
         }
+
+        override fun onDisconnected() {
+            val binding = _binding ?: return
+            lifecycleScope.launch(Dispatchers.Main) {
+                binding.memoryText.text = getString(R.string.loading)
+                binding.goroutinesText.text = getString(R.string.loading)
+            }
+        }
+
+        override fun updateStatus(status: StatusMessage) {
+            val binding = _binding ?: return
+            lifecycleScope.launch(Dispatchers.Main) {
+                binding.memoryText.text = Libbox.formatBytes(status.memory)
+                binding.goroutinesText.text = status.goroutines.toString()
+                val trafficAvailable = status.trafficAvailable
+                binding.trafficContainer.isVisible = trafficAvailable
+                if (trafficAvailable) {
+                    binding.inboundConnectionsText.text = status.connectionsIn.toString()
+                    binding.outboundConnectionsText.text = status.connectionsOut.toString()
+                    binding.uplinkText.text = Libbox.formatBytes(status.uplink) + "/s"
+                    binding.downlinkText.text = Libbox.formatBytes(status.downlink) + "/s"
+                    binding.uplinkTotalText.text = Libbox.formatBytes(status.uplinkTotal)
+                    binding.downlinkTotalText.text = Libbox.formatBytes(status.downlinkTotal)
+                }
+            }
+        }
+
     }
+
+    inner class ClashModeClient : CommandClient.Handler {
+
+        override fun initializeClashMode(modeList: List<String>, currentMode: String) {
+            if (modeList.size > 1) {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    binding.clashModeCard.isVisible = true
+                    binding.clashModeList.adapter = ClashModeAdapter(modeList, currentMode)
+                    binding.clashModeList.layoutManager =
+                        GridLayoutManager(
+                            requireContext(),
+                            if (modeList.size < 3) modeList.size else 3
+                        )
+                }
+            } else {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    binding.clashModeCard.isVisible = false
+                }
+            }
+        }
+
+        @SuppressLint("NotifyDataSetChanged")
+        override fun updateClashMode(newMode: String) {
+            val adapter = binding.clashModeList.adapter as? ClashModeAdapter ?: return
+            adapter.selected = newMode
+            lifecycleScope.launch(Dispatchers.Main) {
+                adapter.notifyDataSetChanged()
+            }
+        }
+
+    }
+
+    private inner class ClashModeAdapter(
+        val items: List<String>,
+        var selected: String
+    ) :
+        RecyclerView.Adapter<ClashModeItemView>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ClashModeItemView {
+            val view = ClashModeItemView(
+                ViewClashModeButtonBinding.inflate(
+                    LayoutInflater.from(parent.context),
+                    parent,
+                    false
+                )
+            )
+            view.binding.clashModeButton.clipToOutline = true
+            return view
+        }
+
+        override fun getItemCount(): Int {
+            return items.size
+        }
+
+        override fun onBindViewHolder(holder: ClashModeItemView, position: Int) {
+            holder.bind(items[position], selected)
+        }
+    }
+
+    private inner class ClashModeItemView(val binding: ViewClashModeButtonBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(item: String, selected: String) {
+            binding.clashModeButtonText.text = item
+            if (item != selected) {
+                binding.clashModeButtonText.setTextColor(
+                    binding.root.context.getAttrColor(com.google.android.material.R.attr.colorOnPrimaryContainer)
+                )
+                binding.clashModeButton.setBackgroundResource(R.drawable.bg_rounded_rectangle)
+                binding.clashModeButton.setOnClickListener {
+                    runCatching {
+                        Libbox.newStandaloneCommandClient().setClashMode(item)
+                        clashModeClient.connect()
+                    }.onFailure {
+                        GlobalScope.launch(Dispatchers.Main) {
+                            binding.root.context.errorDialogBuilder(it).show()
+                        }
+                    }
+                }
+            } else {
+                binding.clashModeButtonText.setTextColor(
+                    binding.root.context.getAttrColor(com.google.android.material.R.attr.colorOnPrimary)
+                )
+                binding.clashModeButton.setBackgroundResource(R.drawable.bg_rounded_rectangle_active)
+                binding.clashModeButton.isClickable = false
+            }
+
+        }
+    }
+
 
     class Adapter(
         internal val scope: CoroutineScope,
