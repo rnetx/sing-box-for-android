@@ -6,14 +6,14 @@ git clone https://github.com/yaotthaha/sing-box-pub sing-box
 cd sing-box
 ##########################
 # 这里可以切换分支
-git checkout dev-next-yaott
+git checkout dev-yaott
 ##########################
 # https://github.com/yaotthaha/sing-box-pub@dev-next-yaott 编译 with_clash_ui 需要，其他分支可以注释掉 #########
-git submodule init
-git submodule update
+# git submodule init
+# git submodule update
 ####################
 # 这里可以修改 tags
-tags="with_dhcp,with_lwip,with_gvisor,with_v2ray_api,with_quic,with_wireguard,with_utls,with_reality_server,with_clash_api,with_shadowsocksr,with_grpc,with_ech,with_proxyprovider,with_clash_ui,with_multiaddr"
+tags="with_dhcp,with_lwip,with_gvisor,with_v2ray_api,with_quic,with_wireguard,with_utls,with_reality_server,with_clash_api,with_shadowsocksr,with_grpc,with_ech,with_proxyprovider,with_ruleprovider,with_clash_ui"
 ####################
 ###### !! 不要动 !! ######
 make lib_install
