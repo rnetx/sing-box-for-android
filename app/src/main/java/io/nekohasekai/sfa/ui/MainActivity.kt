@@ -92,7 +92,7 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val uri = intent.data ?: return
-        if (uri.scheme == "sing-box" && uri.host != "import-remote-profile") {
+        if (uri.scheme == "sing-box" && uri.host == "import-remote-profile") {
             val profile = try {
                 Libbox.parseRemoteProfileImportLink(uri.toString())
             } catch (e: Exception) {
@@ -166,6 +166,8 @@ class MainActivity : AbstractActivity(), ServiceConnection.Callback, DistributeL
             Libbox.ProfileTypeRemote -> {
                 typedProfile.type = TypedProfile.Type.Remote
                 typedProfile.remoteURL = content.remotePath
+                typedProfile.autoUpdate = content.autoUpdate
+                typedProfile.autoUpdateInterval = content.autoUpdateInterval
                 typedProfile.lastUpdated = Date(content.lastUpdated)
             }
         }

@@ -37,8 +37,7 @@ import kotlinx.coroutines.withContext
 class OverviewFragment : Fragment() {
 
     private val activity: MainActivity? get() = super.getActivity() as MainActivity?
-    private var _binding: FragmentDashboardOverviewBinding? = null
-    private val binding get() = _binding!!
+    private var binding: FragmentDashboardOverviewBinding? = null
     private val statusClient =
         CommandClient(lifecycleScope, CommandClient.ConnectionType.Status, StatusClient())
     private val clashModeClient =
@@ -48,13 +47,15 @@ class OverviewFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentDashboardOverviewBinding.inflate(inflater, container, false)
+        val binding = FragmentDashboardOverviewBinding.inflate(inflater, container, false)
+        this.binding = binding
         onCreate()
         return binding.root
     }
 
     private fun onCreate() {
         val activity = activity ?: return
+        val binding = binding ?: return
         binding.profileList.adapter = Adapter(lifecycleScope, binding).apply {
             adapter = this
             reload()
@@ -65,12 +66,14 @@ class OverviewFragment : Fragment() {
         binding.profileList.addItemDecoration(divider)
         activity.serviceStatus.observe(viewLifecycleOwner) {
             binding.statusContainer.isVisible = it == Status.Starting || it == Status.Started
-            if (it != Status.Started) {
+            if (it == Status.Stopped) {
                 binding.clashModeCard.isVisible = false
+                binding.systemProxyCard.isVisible = false
             }
             if (it == Status.Started) {
                 statusClient.connect()
                 clashModeClient.connect()
+                reloadSystemProxyStatus()
             }
         }
         ProfileManager.registerCallback(this::updateProfiles)
@@ -79,7 +82,7 @@ class OverviewFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         adapter = null
-        _binding = null
+        binding = null
         statusClient.disconnect()
         clashModeClient.disconnect()
         ProfileManager.unregisterCallback(this::updateProfiles)
@@ -89,10 +92,34 @@ class OverviewFragment : Fragment() {
         adapter?.reload()
     }
 
+    private fun reloadSystemProxyStatus() {
+        val binding = binding ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            val status = Libbox.newStandaloneCommandClient().systemProxyStatus
+            withContext(Dispatchers.Main) {
+                binding.systemProxyCard.isVisible = status.available
+                binding.systemProxyCard.isEnabled = true
+                binding.systemProxySwitch.setOnClickListener(null)
+                binding.systemProxySwitch.isChecked = status.enabled
+                binding.systemProxySwitch.setOnCheckedChangeListener { buttonView, isChecked ->
+                    binding.systemProxyCard.isEnabled = false
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        Settings.systemProxyEnabled = isChecked
+                        runCatching {
+                            Libbox.newStandaloneCommandClient().setSystemProxyEnabled(isChecked)
+                        }.onFailure {
+                            buttonView.context.errorDialogBuilder(it).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     inner class StatusClient : CommandClient.Handler {
 
         override fun onConnected() {
-            val binding = _binding ?: return
+            val binding = binding ?: return
             lifecycleScope.launch(Dispatchers.Main) {
                 binding.memoryText.text = getString(R.string.loading)
                 binding.goroutinesText.text = getString(R.string.loading)
@@ -100,7 +127,7 @@ class OverviewFragment : Fragment() {
         }
 
         override fun onDisconnected() {
-            val binding = _binding ?: return
+            val binding = binding ?: return
             lifecycleScope.launch(Dispatchers.Main) {
                 binding.memoryText.text = getString(R.string.loading)
                 binding.goroutinesText.text = getString(R.string.loading)
@@ -108,7 +135,7 @@ class OverviewFragment : Fragment() {
         }
 
         override fun updateStatus(status: StatusMessage) {
-            val binding = _binding ?: return
+            val binding = binding ?: return
             lifecycleScope.launch(Dispatchers.Main) {
                 binding.memoryText.text = Libbox.formatBytes(status.memory)
                 binding.goroutinesText.text = status.goroutines.toString()
@@ -130,6 +157,7 @@ class OverviewFragment : Fragment() {
     inner class ClashModeClient : CommandClient.Handler {
 
         override fun initializeClashMode(modeList: List<String>, currentMode: String) {
+            val binding = binding ?: return
             if (modeList.size > 1) {
                 lifecycleScope.launch(Dispatchers.Main) {
                     binding.clashModeCard.isVisible = true
@@ -149,6 +177,7 @@ class OverviewFragment : Fragment() {
 
         @SuppressLint("NotifyDataSetChanged")
         override fun updateClashMode(newMode: String) {
+            val binding = binding ?: return
             val adapter = binding.clashModeList.adapter as? ClashModeAdapter ?: return
             adapter.selected = newMode
             lifecycleScope.launch(Dispatchers.Main) {
